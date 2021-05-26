@@ -13,7 +13,8 @@ load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
-config.set_main_option('sqlalchemy.url', os.environ.get('DATABASE_URL'))
+config.set_main_option('sqlalchemy.url', os.environ.get(
+    'DATABASE_URL').replace('postgres', 'postgresql'))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
