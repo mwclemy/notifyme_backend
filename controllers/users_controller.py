@@ -25,9 +25,7 @@ def create_user():
     models.db.session.add(user)
     models.db.session.commit()
 
-    encrypted_id = jwt.encode({"user_id": user.id}, os.environ.get(
-        'JWT_SECRET'), algorithm="HS256").decode('utf-8')
-    return {"user": user.to_json(), "user_id": encrypted_id}
+    return {"user": user.to_json(), "user_id": user.id}
 
 
 def login():
@@ -36,20 +34,13 @@ def login():
         return {"message": "User not found"}, 404
 
     if bcrypt.check_password_hash(user.password, request.json["password"]):
-        encrypted_id = jwt.encode({"user_id": user.id}, os.environ.get(
-            'JWT_SECRET'), algorithm="HS256").decode('utf-8')
-        print(encrypted_id)
-        return {"user": user.to_json(), "user_id": encrypted_id}
+        return {"user": user.to_json(), "user_id": user.id}
     else:
         return {"message": "Password incorrect"}, 401
 
 
 def verify_user():
-    print(request.headers["Authorization"])
-    print(os.environ.get(
-        'JWT_SECRET'))
-    decrypted_id = jwt.decode(request.headers["Authorization"], os.environ.get(
-        'JWT_SECRET'), algorithms=["HS256"])["user_id"]
+    if request.headers["Authorization"]:
     user = models.User.query.filter_by(id=decrypted_id).first()
     if not user:
         return {"message": "user not found"}, 404
