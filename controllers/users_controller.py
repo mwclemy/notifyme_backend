@@ -24,7 +24,6 @@ def create_user():
 
     models.db.session.add(user)
     models.db.session.commit()
-
     encrypted_id = jwt.encode({"user_id": user.id}, os.environ.get(
         'JWT_SECRET'), algorithm="HS256").decode('utf-8')
     return {"user": user.to_json(), "user_id": encrypted_id}

@@ -2,7 +2,7 @@ from .db import db
 
 
 class AccessToken(db.Model):
-    __tablename__ = 'users'
+    __tablename__ = 'bank_access_tokens'
     id = db.Column(db.Integer, primary_key=True)
     access_token = db.Column(db.String)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))

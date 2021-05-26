@@ -185,25 +185,39 @@ def get_auth():
         return jsonify(error_response)
 
 
+def all_transactions(access_token, start_date, end_date):
+    options = TransactionsGetRequestOptions()
+    request = TransactionsGetRequest(
+        access_token=access_token,
+        start_date=start_date.date(),
+        end_date=end_date.date(),
+        options=options
+    )
+    response = client.transactions_get(request)
+    transactions = response.transactions
+    return transactions
+
+
 def get_transactions():
     # Pull transactions for the last 30 days
     start_date = (datetime.datetime.now() - timedelta(days=30))
     end_date = datetime.datetime.now()
-    access_token = req.json["access_token"]
-    try:
-        options = TransactionsGetRequestOptions()
-        request = TransactionsGetRequest(
-            access_token=access_token,
-            start_date=start_date.date(),
-            end_date=end_date.date(),
-            options=options
-        )
-        response = client.transactions_get(request)
-        pretty_print_response(response.to_dict())
-        return jsonify(response.to_dict())
-    except plaid.ApiException as e:
-        error_response = format_error(e)
-        return jsonify(error_response)
+    user = req.user
+    if user:
+        try:
+            access_tokens = user.access_tokens
+            transactions = []
+            for access_token in access_tokens:
+                transactions += all_transactions(
+                    access_token.access_token, start_date, end_date)
+            print(type(transactions))
+            return jsonify({"transactions": transactions})
+        except plaid.ApiException as e:
+            error_response = format_error(e)
+            return jsonify(error_response)
+
+    else:
+        return {"message": "user not found"}, 400
 
 
 def item():
