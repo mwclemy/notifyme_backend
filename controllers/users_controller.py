@@ -39,11 +39,8 @@ def login():
 
 
 def verify_user():
-    if request.headers["Authorization"]:
-        user = models.User.query.filter_by(
-            id=request.headers["Authorization"]).first()
-        if not user:
-            return {"message": "user not found"}, 404
+    user = request.user
+    if user:
         return {"user": user.to_json()}
     else:
-        return {"message": "User id is required."}, 400
+        return {"message": "User not found."}, 400

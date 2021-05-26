@@ -23,9 +23,8 @@ models.db.init_app(app)
 def lookup_user():
     try:
         if request.headers["Authorization"]:
-            decrypted_id = jwt.decode(request.headers["Authorization"], os.environ.get(
-                'JWT_SECRET'), algorithms=["HS256"])["user_id"]
-            user = models.User.query.filter_by(id=decrypted_id).first()
+            user = models.User.query.filter_by(
+                id=request.headers["Authorization"]).first()
             request.user = user
         else:
             request.user = None
