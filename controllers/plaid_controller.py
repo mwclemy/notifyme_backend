@@ -198,6 +198,17 @@ def all_transactions(access_token, start_date, end_date):
     return transactions
 
 
+def get_institution(access_token):
+    request = ItemGetRequest(access_token=access_token)
+    response = client.item_get(request)
+    request = InstitutionsGetByIdRequest(
+        institution_id=response['item']['institution_id'],
+        country_codes=[CountryCode('US')]
+    )
+    institution_response = client.institutions_get_by_id(request)
+    return institution_response
+
+
 def get_transactions():
     # Pull transactions for the last 30 days
     start_date = (datetime.datetime.now() - timedelta(days=30))
@@ -210,8 +221,7 @@ def get_transactions():
             for access_token in access_tokens:
                 transactions += all_transactions(
                     access_token.access_token, start_date, end_date)
-            print(type(transactions))
-            return jsonify({"transactions": transactions})
+            return jsonify({"transactions":  [t.to_dict() for t in transactions]})
         except plaid.ApiException as e:
             error_response = format_error(e)
             return jsonify(error_response)
@@ -220,23 +230,19 @@ def get_transactions():
         return {"message": "user not found"}, 400
 
 
-def item():
-    try:
-        access_token = req.json["access_token"]
-        request = ItemGetRequest(access_token=access_token)
-        response = client.item_get(request)
-        request = InstitutionsGetByIdRequest(
-            institution_id=response['item']['institution_id'],
-            country_codes=[CountryCode('US')]
-        )
-        institution_response = client.institutions_get_by_id(request)
-        pretty_print_response(response.to_dict())
-        pretty_print_response(institution_response.to_dict())
-        return jsonify({'error': None, 'item': response.to_dict()[
-            'item'], 'institution': institution_response.to_dict()['institution']})
-    except plaid.ApiException as e:
-        error_response = format_error(e)
-        return jsonify(error_response)
+def get_institutions():
+    user = req.user
+    if user:
+        try:
+            access_tokens = user.access_tokens
+            institutions = []
+            for access_token in access_tokens:
+                institutions.append(get_institution(
+                    access_token.access_token))
+            return jsonify({"institutions":  [i.to_dict()['institution'] for i in institutions]})
+        except plaid.ApiException as e:
+            error_response = format_error(e)
+            return jsonify(error_response)
 
 
 def pretty_print_response(response):

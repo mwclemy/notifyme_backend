@@ -13,5 +13,5 @@ def apply_plaid_routes(app):
     app.route('/api/transactions',
               methods=["GET"])(plaid_controller.get_transactions)
 
-    app.route('/api/item',
-              methods=["GET"])(plaid_controller.item)
+    app.route('/api/institutions',
+              methods=["GET"])(plaid_controller.get_institutions)
