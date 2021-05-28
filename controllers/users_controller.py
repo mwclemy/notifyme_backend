@@ -25,7 +25,7 @@ def create_user():
     models.db.session.add(user)
     models.db.session.commit()
     encrypted_id = jwt.encode({"user_id": user.id}, os.environ.get(
-        'JWT_SECRET'), algorithm="HS256").decode('utf-8')
+        'JWT_SECRET'), algorithm="HS256")
     return {"user": user.to_json(), "user_id": encrypted_id}
 
 
@@ -37,7 +37,6 @@ def login():
     if bcrypt.check_password_hash(user.password, request.json["password"]):
         encrypted_id = jwt.encode({"user_id": user.id}, os.environ.get(
             'JWT_SECRET'), algorithm="HS256")
-        print(encrypted_id)
         return {"user": user.to_json(), "user_id": encrypted_id}
     else:
         return {"message": "Password incorrect"}, 401

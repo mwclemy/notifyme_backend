@@ -39,6 +39,7 @@ import datetime
 import json
 import time
 import math
+from twilio.rest import Client as TwilioClient
 
 import models
 from dotenv import load_dotenv
@@ -64,6 +65,9 @@ PLAID_COUNTRY_CODES = os.getenv('PLAID_COUNTRY_CODES', 'US').split(',')
 MAX_TRANSACTIONS_PER_PAGE = 500
 OMIT_CATEGORIES = ["Transfer", "Credit Card", "Deposit", "Payment"]
 OMIT_ACCOUNT_SUBTYPES = ['cd', 'savings']
+
+twilio_client = TwilioClient(
+    os.getenv('TWILIO_SID'), os.getenv('TWILIO_TOKEN'))
 
 
 def empty_to_none(field):
@@ -204,21 +208,27 @@ def all_transactions(access_token, start_date, end_date):
 
 
 def get_yesterdays_transactions(access_token, start_date, end_date):
-    account_ids = [account['account_id'] for account in client.Accounts.get(access_token)['accounts']
-                   if account['subtype'] not in OMIT_ACCOUNT_SUBTYPES]
 
-    num_available_transactions = TransactionsGetRequest(access_token, start_date, end_date,
-                                                        account_ids=account_ids)['total_transactions']
+    account_ids = [account['account_id'] for account in client.accounts_get(
+        AccountsGetRequest(access_token=access_token))['accounts']
+        if account['subtype'] not in OMIT_ACCOUNT_SUBTYPES]
+
+    num_available_transactions = client.transactions_get(TransactionsGetRequest(access_token, start_date, end_date,
+                                                                                options=TransactionsGetRequestOptions(
+                                                                                    account_ids=account_ids)
+                                                                                ))['total_transactions']
     num_pages = math.ceil(num_available_transactions /
                           MAX_TRANSACTIONS_PER_PAGE)
     transactions = []
 
     for page_num in range(num_pages):
         transactions += [transaction
-                         for transaction in TransactionsGetRequest(access_token, start_date, end_date,
-                                                                   account_ids=account_ids,
-                                                                   offset=page_num * MAX_TRANSACTIONS_PER_PAGE,
-                                                                   count=MAX_TRANSACTIONS_PER_PAGE)['transactions']
+                         for transaction in client.transactions_get(TransactionsGetRequest(access_token, start_date, end_date,
+                                                                                           options=TransactionsGetRequestOptions(
+                                                                                               account_ids=account_ids, offset=page_num * MAX_TRANSACTIONS_PER_PAGE,
+                                                                                               count=MAX_TRANSACTIONS_PER_PAGE)
+
+                                                                                           ))['transactions']
                          if transaction['category'] is None
                          or not any(category in OMIT_CATEGORIES
                                     for category in transaction['category'])]
@@ -277,10 +287,15 @@ def get_institutions():
 
 
 def send_notification():
-    start_date = (datetime.date.today() -
-                  datetime.timedelta(days=1)).strftime('%Y-%m-%d')
-    end_date = (datetime.date.today() -
-                datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    # Pull Yesterday's transactions
+    # start_date = (datetime.date.today() -
+    #               datetime.timedelta(days=1))
+    # end_date = (datetime.date.today() -
+    #             datetime.timedelta(days=1))
+
+    # Pull transactions for the last 30 days
+    start_date = (datetime.date.today() - timedelta(days=30))
+    end_date = datetime.date.today()
     user = req.user
     if user:
         try:
@@ -292,8 +307,9 @@ def send_notification():
             total_spent = sum(transaction['amount']
                               for transaction in transactions)
             if (total_spent > user.threshold_amount):
-                # send sms
-                pass
+                message = f'You spent ${total_spent} yesterday. 💸'
+                twilio_client.messages.create(
+                    to=user.phone, from_=os.getenv('MY_TWILIO_NUM'), body=message)
             return jsonify({"transactions":  [t.to_dict() for t in transactions], "total_spent": total_spent})
         except plaid.ApiException as e:
             error_response = format_error(e)
