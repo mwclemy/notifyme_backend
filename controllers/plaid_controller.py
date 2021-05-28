@@ -38,6 +38,7 @@ import os
 import datetime
 import json
 import time
+import math
 
 import models
 from dotenv import load_dotenv
@@ -59,6 +60,10 @@ PLAID_PRODUCTS = os.getenv('PLAID_PRODUCTS', 'transactions').split(',')
 # PLAID_COUNTRY_CODES is a comma-separated list of countries for which users
 # will be able to select institutions from.
 PLAID_COUNTRY_CODES = os.getenv('PLAID_COUNTRY_CODES', 'US').split(',')
+
+MAX_TRANSACTIONS_PER_PAGE = 500
+OMIT_CATEGORIES = ["Transfer", "Credit Card", "Deposit", "Payment"]
+OMIT_ACCOUNT_SUBTYPES = ['cd', 'savings']
 
 
 def empty_to_none(field):
@@ -198,6 +203,29 @@ def all_transactions(access_token, start_date, end_date):
     return transactions
 
 
+def get_yesterdays_transactions(access_token, start_date, end_date):
+    account_ids = [account['account_id'] for account in client.Accounts.get(access_token)['accounts']
+                   if account['subtype'] not in OMIT_ACCOUNT_SUBTYPES]
+
+    num_available_transactions = TransactionsGetRequest(access_token, start_date, end_date,
+                                                        account_ids=account_ids)['total_transactions']
+    num_pages = math.ceil(num_available_transactions /
+                          MAX_TRANSACTIONS_PER_PAGE)
+    transactions = []
+
+    for page_num in range(num_pages):
+        transactions += [transaction
+                         for transaction in TransactionsGetRequest(access_token, start_date, end_date,
+                                                                   account_ids=account_ids,
+                                                                   offset=page_num * MAX_TRANSACTIONS_PER_PAGE,
+                                                                   count=MAX_TRANSACTIONS_PER_PAGE)['transactions']
+                         if transaction['category'] is None
+                         or not any(category in OMIT_CATEGORIES
+                                    for category in transaction['category'])]
+
+    return transactions
+
+
 def get_institution(access_token):
     request = ItemGetRequest(access_token=access_token)
     response = client.item_get(request)
@@ -243,6 +271,36 @@ def get_institutions():
         except plaid.ApiException as e:
             error_response = format_error(e)
             return jsonify(error_response)
+
+    else:
+        return {"message": "user not found"}, 400
+
+
+def send_notification():
+    start_date = (datetime.date.today() -
+                  datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    end_date = (datetime.date.today() -
+                datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+    user = req.user
+    if user:
+        try:
+            access_tokens = user.access_tokens
+            transactions = []
+            for access_token in access_tokens:
+                transactions += get_yesterdays_transactions(
+                    access_token.access_token, start_date, end_date)
+            total_spent = sum(transaction['amount']
+                              for transaction in transactions)
+            if (total_spent > user.threshold_amount):
+                # send sms
+                pass
+            return jsonify({"transactions":  [t.to_dict() for t in transactions], "total_spent": total_spent})
+        except plaid.ApiException as e:
+            error_response = format_error(e)
+            return jsonify(error_response)
+
+    else:
+        return {"message": "user not found"}, 400
 
 
 def pretty_print_response(response):

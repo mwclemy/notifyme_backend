@@ -49,3 +49,14 @@ def verify_user():
         return {"user": user.to_json()}
     else:
         return {"message": "user not found"}, 404
+
+
+def update_threshold_amount():
+    user = request.user
+    if user:
+        user.threshold_amount = request.json["threshold_amount"]
+        models.db.session.add(user)
+        models.db.session.commit()
+        return {"user": user.to_json()}
+    else:
+        return {"message": "user not found"}, 404

@@ -5,3 +5,5 @@ def apply_users_routes(app):
     app.route('/users', methods=["POST"])(users_controller.create_user)
     app.route('/users/login', methods=["POST"])(users_controller.login)
     app.route('/users/verify', methods=["GET"])(users_controller.verify_user)
+    app.route('/users/update_threshold_amount',
+              methods=["PUT"])(users_controller.update_threshold_amount)

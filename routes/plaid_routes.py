@@ -15,3 +15,6 @@ def apply_plaid_routes(app):
 
     app.route('/api/institutions',
               methods=["GET"])(plaid_controller.get_institutions)
+
+    app.route('/api/send_notification',
+              methods=["POST"])(plaid_controller.send_notification)
